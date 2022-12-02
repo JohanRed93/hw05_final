@@ -1,0 +1,34 @@
+{% load thumbnail %}
+  <article>
+    <ul>
+      <li> Автор:
+        {% if is_profile %}
+          {% if post.author.get_full_name %}
+            {{ post.author.get_full_name }}
+          {% else %}
+            {{ post.author }}
+          {% endif %}
+        {% else %}          
+          {% if post.author.get_full_name %} 
+            <a href="{% url 'posts:profile' post.author %}">{{ post.author.get_full_name }}</a>
+          {% else %}
+            <a href="{% url 'posts:profile' post.author %}">{{ post.author }}</a>
+          {% endif %}
+        {% endif %}
+      </li>
+      <li>
+        Дата публикации: {{ post.pub_date|date:"d E Y" }}
+      </li>
+    </ul>
+    {% thumbnail post.image "960x339" crop="center" upscale=True as im %}
+      <img class="card-img my-2" src="{{ im.url }}">
+    {% endthumbnail %}    
+    <p>{{ post.text|linebreaks }}</p>
+    <a href="{% url 'posts:post_detail' post.pk %}">подробная информация </a><br>
+    {% if post.group_id and page_with_links %}
+      <a href="{% url 'posts:group_list' post.group.slug %}">все записи группы</a>    
+    {% endif %}     
+    {% if not forloop.last %}
+      <hr>
+    {% endif %}
+  </article>    

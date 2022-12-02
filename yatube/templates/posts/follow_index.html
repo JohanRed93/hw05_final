@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block title %}
+  Персональная лента
+{% endblock %}
+{% block header %}
+  Персональная лента
+{% endblock %}
+{% block content %}
+  {% include 'includes/switcher.html' %}
+    {% for post in page_obj %}
+      {% include 'includes/post.html' with page_with_links=True %}
+    {% endfor %}
+  {% include 'includes/paginator.html' %}  
+{% endblock %}
