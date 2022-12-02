@@ -24,8 +24,9 @@ class PostForm(forms.ModelForm):
         help_texts = {
             'text': ('Введите текст поста'),
             'group': ('Выберите группу'),
-            'image': ('Выберите изображение'),            
+            'image': ('Выберите изображение'),
         }
+
 
 class CommentForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
@@ -33,7 +34,7 @@ class CommentForm(forms.ModelForm):
         self.fields['text'].widget.attrs['placeholder'] = (
             'В комментах не гадить, а то закроем бассеин'
         )
+
     class Meta:
         model = Comment
         fields = ('text', )
-

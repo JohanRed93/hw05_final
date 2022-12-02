@@ -37,8 +37,8 @@ def profile(request, username):
         request.user.is_authenticated and Follow.objects.filter(
             user=request.user,
             author=author
-            ).exists()
-    )    
+        ).exists()
+    )
     context = {
         'author': author,
         'page_obj': page_obj,
@@ -82,7 +82,7 @@ def post_edit(request, post_id):
     if post.author != request.user:
         return redirect('posts:profile', username=post.author)
     form = PostForm(
-        request.POST or None, 
+        request.POST or None,
         files=request.FILES or None,
         instance=post,
     )
@@ -96,6 +96,7 @@ def post_edit(request, post_id):
         return redirect('posts:post_detail', post_id=post_id)
     return render(request, template, context)
 
+
 @login_required
 def add_comment(request, post_id):
     post = get_object_or_404(Post, id=post_id)
@@ -105,7 +106,8 @@ def add_comment(request, post_id):
         comment.author = request.user
         comment.post = post
         comment.save()
-    return redirect('posts:post_detail', post_id=post_id) 
+    return redirect('posts:post_detail', post_id=post_id)
+
 
 @login_required
 def follow_index(request):

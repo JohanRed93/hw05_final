@@ -1,7 +1,6 @@
 from django import forms
 from django.test import Client, TestCase
 from django.urls import reverse
-from django.core.files.uploadedfile import SimpleUploadedFile
 
 from posts.models import Group, Post, User
 from posts.forms import PostForm

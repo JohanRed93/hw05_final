@@ -37,7 +37,8 @@ class Post(models.Model):
         'Картинка',
         upload_to='posts/',
         blank=True
-    )  
+    )
+
     class Meta:
         verbose_name = 'Post'
         verbose_name_plural = 'Posts'
@@ -45,6 +46,7 @@ class Post(models.Model):
 
     def __str__(self) -> str:
         return f'{self.text[:settings.DEFAULT_POSTS_PER_PAGE]}'
+
 
 class Comment(models.Model):
     post = models.ForeignKey(
@@ -71,6 +73,7 @@ class Comment(models.Model):
         ordering = ('-created',)
         verbose_name = 'Комментарий'
         verbose_name_plural = 'Комментарии'
+
 
 class Follow(models.Model):
     user = models.ForeignKey(User, related_name='follower',
