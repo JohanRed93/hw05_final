@@ -71,10 +71,6 @@ class PostURLTests(TestCase):
         response = self.authorized_client.get(self.pages_authorized[-1])
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
 
-    def test_404_page(self):
-        response = self.guest_client.get('/404_page/')
-        self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
-
     def test_only_author_post_edit(self):
         response = self.post_author.get(f'/posts/{self.post.id}/edit/')
         self.assertEqual(response.status_code, HTTPStatus.OK)
