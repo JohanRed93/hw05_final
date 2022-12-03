@@ -1,5 +1,5 @@
-from django.core.paginator import Paginator
 from django.conf import settings
+from django.core.paginator import Paginator
 
 
 def base_paginator(request, posts):

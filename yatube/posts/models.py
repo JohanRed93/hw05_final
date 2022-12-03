@@ -50,7 +50,7 @@ class Post(models.Model):
 
 class Comment(models.Model):
     post = models.ForeignKey(
-        'Post',
+        Post,
         on_delete=models.CASCADE,
         related_name='comments',
         verbose_name='Текст поста',

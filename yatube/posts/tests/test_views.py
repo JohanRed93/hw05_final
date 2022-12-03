@@ -1,8 +1,9 @@
 from django import forms
+from django.core.cache import cache
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from posts.models import Group, Post, User
+from posts.models import Group, Post, User, Follow
 from posts.forms import PostForm
 
 
@@ -44,7 +45,6 @@ class PostPagesTests(TestCase):
         self.assertEqual(obj.pk, self.post.pk)
         self.assertEqual(obj.text, self.post.text)
         self.assertEqual(obj.group.slug, self.group.slug)
-        self.assertEqual(obj.image, self.post.image)
 
     def test_main_page_context(self):
         response = self.authorized_client.get(reverse('posts:index_page'))
@@ -120,3 +120,95 @@ class PostPagesTests(TestCase):
         url = reverse('posts:group_list', kwargs={'slug': self.group.slug})
         response = self.guest_client.get(url)
         self.assertNotIn(self.post2, response.context.get('page_obj'))
+
+    def test_cache_context(self):
+        before_create_post = self.authorized_client.get(
+            reverse('posts:index_page'))
+        first_item_before = before_create_post.content
+        Post.objects.create(
+            author=self.user,
+            text='Cash test',
+            group=self.group)
+        after_create_post = self.authorized_client.get(
+            reverse('posts:index_page'))
+        first_item_after = after_create_post.content
+        self.assertEqual(first_item_after, first_item_before)
+        cache.clear()
+        after_clear = self.authorized_client.get(reverse('posts:index_page'))
+        self.assertNotEqual(first_item_after, after_clear)
+
+
+class FollowViewsTest(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.user = User.objects.create_user(username='auth1')
+        cls.user2 = User.objects.create_user(username='auth2')
+        cls.author = User.objects.create_user(username='someauthor')
+
+    def setUp(self):
+        self.guest_client = Client()
+        self.authorized_client = Client()
+        self.authorized_client.force_login(self.user)
+        self.authorized_client2 = Client()
+        self.authorized_client2.force_login(self.user2)
+
+    def test_user_following_authors(self):
+        count_follow = Follow.objects.filter(user=FollowViewsTest.user).count()
+        data_follow = {'user': FollowViewsTest.user,
+                       'author': FollowViewsTest.author}
+        url_redirect = reverse(
+            'posts:profile',
+            kwargs={'username': FollowViewsTest.author.username})
+        response = self.authorized_client.post(
+            reverse('posts:profile_follow', kwargs={
+                'username': FollowViewsTest.author.username}),
+            data=data_follow, follow=True)
+        new_count_follow = Follow.objects.filter(
+            user=FollowViewsTest.user).count()
+        self.assertTrue(Follow.objects.filter(
+                        user=FollowViewsTest.user,
+                        author=FollowViewsTest.author).exists())
+        self.assertRedirects(response, url_redirect)
+        self.assertEqual(count_follow + 1, new_count_follow)
+
+    def test_user_unfollower_authors(self):
+        count_follow = Follow.objects.filter(
+            user=FollowViewsTest.user).count()
+        data_follow = {'user': FollowViewsTest.user,
+                       'author': FollowViewsTest.author}
+        url_redirect = ('/auth/login/?next=/profile/'
+                        f'{self.author.username}/unfollow/')
+        response = self.guest_client.post(
+            reverse('posts:profile_unfollow', kwargs={
+                'username': FollowViewsTest.author}),
+            data=data_follow, follow=True)
+        new_count_follow = Follow.objects.filter(
+            user=FollowViewsTest.user).count()
+        self.assertFalse(Follow.objects.filter(
+            user=FollowViewsTest.user,
+            author=FollowViewsTest.author).exists())
+        self.assertRedirects(response, url_redirect)
+        self.assertEqual(count_follow, new_count_follow)
+
+    def test_follower_see(self):
+        new_post_follower = Post.objects.create(
+            author=FollowViewsTest.author,
+            text='test text')
+        Follow.objects.create(user=FollowViewsTest.user,
+                              author=FollowViewsTest.author)
+        response_follower = self.authorized_client.get(
+            reverse('posts:follow_index'))
+        new_posts = response_follower.context['page_obj']
+        self.assertIn(new_post_follower, new_posts)
+
+    def test_unfollower_no_see(self):
+        new_post_follower = Post.objects.create(
+            author=FollowViewsTest.author,
+            text='test text')
+        Follow.objects.create(user=FollowViewsTest.user,
+                              author=FollowViewsTest.author)
+        response_unfollower = self.authorized_client2.get(
+            reverse('posts:follow_index'))
+        new_post_unfollower = response_unfollower.context['page_obj']
+        self.assertNotIn(new_post_follower, new_post_unfollower)

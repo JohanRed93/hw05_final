@@ -129,6 +129,6 @@ def profile_follow(request, username):
 
 @login_required
 def profile_unfollow(request, username):
-    user = request.user
-    Follow.objects.filter(user=user, author__username=username).delete()
+    Follow.objects.filter(
+        user=request.user, author__username=username).delete()
     return redirect("posts:profile", username=username)

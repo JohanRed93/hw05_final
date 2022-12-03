@@ -1,10 +1,11 @@
 from http import HTTPStatus
 
 from django.conf import settings
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from posts.models import Group, Post, User
+from posts.models import Group, Post, User, Comment, Follow
 from posts.forms import PostForm
 
 TEST_NUMBER_OF_POST = 11
@@ -133,10 +134,14 @@ class PostFormTests(TestCase):
 
 
 class PaginatorViewsTest(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.user = User.objects.create_user(username='auth1')
+        cls.author = User.objects.create_user(username='someauthor')
 
     def setUp(self):
         self.guest_client = Client()
-        self.user = User.objects.create_user(username='auth')
         self.authorized_client = Client()
         self.authorized_client.force_login(self.user)
         self.group = Group.objects.create(
@@ -147,18 +152,23 @@ class PaginatorViewsTest(TestCase):
         for i in range(TEST_NUMBER_OF_POST):
             test_posts.append(Post(text=f'Тестовый текст {i}',
                                    group=self.group,
-                                   author=self.user))
+                                   author=PaginatorViewsTest.author))
         Post.objects.bulk_create(test_posts)
 
     def test_paginator_context_in_guest_client(self):
         pages = (reverse('posts:index_page'),
                  reverse('posts:profile',
-                         kwargs={'username': f'{self.user.username}'}),
+                         kwargs={'username': f'{PaginatorViewsTest.author.username}'}),
                  reverse('posts:group_list',
-                         kwargs={'slug': f'{self.group.slug}'}))
+                         kwargs={'slug': f'{self.group.slug}'}),
+                 reverse('posts:follow_index')
+                 )
+        Follow.objects.create(user=PaginatorViewsTest.user,
+                              author=PaginatorViewsTest.author)
+
         for page in pages:
-            response1 = self.guest_client.get(page)
-            response2 = self.guest_client.get(page + '?page=2')
+            response1 = self.authorized_client.get(page)
+            response2 = self.authorized_client.get(page + '?page=2')
             count_posts1 = len(response1.context['page_obj'])
             count_posts2 = len(response2.context['page_obj'])
             self.assertEqual(
@@ -169,3 +179,49 @@ class PaginatorViewsTest(TestCase):
                 count_posts2,
                 TEST_NUMBER_OF_POST - settings.DEFAULT_POSTS_PER_PAGE,
             )
+
+
+class CommentFormTest(TestCase):
+    def setUp(self):
+        self.guest_client = Client()
+        self.user = User.objects.create_user(username='auth')
+        self.authorized_client = Client()
+        self.authorized_client.force_login(self.user)
+        self.group = Group.objects.create(title='Test group',
+                                          slug='test-group',
+                                          description='Description')
+        self.post = Post.objects.create(text='Test text',
+                                        author=self.user,
+                                        group=self.group)
+        self.comment = Comment.objects.create(post_id=self.post.id,
+                                              author=self.user,
+                                              text='Test comment')
+
+    def test_create_comment(self):
+        comment_count = Comment.objects.count()
+        form_data = {'post_id': self.post.id,
+                     'text': 'Test comment2'}
+        response = self.authorized_client.post(
+            reverse('posts:add_comment',
+                    kwargs={'post_id': self.post.id}),
+            data=form_data, follow=True)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertTrue(Comment.objects.filter(
+                        text='Test comment2',
+                        post=self.post.id,
+                        author=self.user
+                        ).exists())
+        self.assertEqual(Comment.objects.count(),
+                         comment_count + 1)
+
+    def test_no_edit_comment(self):
+        posts_count = Comment.objects.count()
+        form_data = {'text': 'Test comment2'}
+        response = self.guest_client.post(reverse('posts:add_comment',
+                                          kwargs={'post_id': self.post.id}),
+                                          data=form_data,
+                                          follow=True)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertNotEqual(Comment.objects.count(),
+                            posts_count + 1
+                            )
