@@ -1,16 +1,32 @@
+import shutil
+import tempfile
+
 from django import forms
+from django.conf import settings
 from django.core.cache import cache
-from django.test import Client, TestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
 from posts.models import Group, Post, User, Follow
 from posts.forms import PostForm
 
+TEMP_MEDIA_ROOT = tempfile.mkdtemp(dir=settings.BASE_DIR)
 
+
+@override_settings(MEDIA_ROOT=TEMP_MEDIA_ROOT)
 class PostPagesTests(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        cls.easy_gif = (
+            b'\x47\x49\x46\x38\x39\x61\x02\x00'
+            b'\x01\x00\x80\x00\x00\x00\x00\x00'
+            b'\xFF\xFF\xFF\x21\xF9\x04\x00\x00'
+            b'\x00\x00\x00\x2C\x00\x00\x00\x00'
+            b'\x02\x00\x01\x00\x00\x02\x02\x0C'
+            b'\x0A\x00\x3B'
+        )
         cls.user = User.objects.create_user(username='FirstTestUser')
         cls.group = Group.objects.create(
             title='Test group title 1',
@@ -21,6 +37,11 @@ class PostPagesTests(TestCase):
             author=cls.user,
             text='Body of test post',
             group=cls.group,
+            image=SimpleUploadedFile(
+                name='easy.gif',
+                content=cls.easy_gif,
+                content_type='image/gif'
+            )
         )
         cls.user2 = User.objects.create_user(username='SecondTestUser')
         cls.group2 = Group.objects.create(
@@ -32,6 +53,11 @@ class PostPagesTests(TestCase):
             author=cls.user2,
             text='Second post Body',
             group=cls.group2,
+            image=SimpleUploadedFile(
+                name='easy.gif',
+                content=cls.easy_gif,
+                content_type='image/gif'
+            )
         )
 
     def setUp(self):
@@ -41,10 +67,16 @@ class PostPagesTests(TestCase):
         self.authorized_client = Client()
         self.authorized_client.force_login(self.user)
 
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(settings.MEDIA_ROOT, ignore_errors=True)
+        super().tearDownClass()
+
     def collected_asserts(self, obj):
         self.assertEqual(obj.pk, self.post.pk)
         self.assertEqual(obj.text, self.post.text)
         self.assertEqual(obj.group.slug, self.group.slug)
+        self.assertEqual(obj.image, self.post.image)
 
     def test_main_page_context(self):
         response = self.authorized_client.get(reverse('posts:index_page'))

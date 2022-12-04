@@ -1,15 +1,20 @@
+import shutil
+import tempfile
 from http import HTTPStatus
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.conf import settings
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
 from posts.models import Group, Post, User, Comment, Follow
 from posts.forms import PostForm
 
 TEST_NUMBER_OF_POST = 11
+TEMP_MEDIA_ROOT = tempfile.mkdtemp(dir=settings.BASE_DIR)
 
 
+@override_settings(MEDIA_ROOT=TEMP_MEDIA_ROOT)
 class PostFormTests(TestCase):
     @classmethod
     def setUpClass(cls):
@@ -34,37 +39,67 @@ class PostFormTests(TestCase):
             author=cls.user,
             text='Body of test post',
             group=cls.group,
+            image=None
         )
         cls.form = PostForm()
 
     def setUp(self):
+        self.gif = (
+            b'\x47\x49\x46\x38\x39\x61\x02\x00'
+            b'\x01\x00\x80\x00\x00\x00\x00\x00'
+            b'\xFF\xFF\xFF\x21\xF9\x04\x00\x00'
+            b'\x00\x00\x00\x2C\x00\x00\x00\x00'
+            b'\x02\x00\x01\x00\x00\x02\x02\x0C'
+            b'\x0A\x00\x3B'
+        )
+        self.easy = SimpleUploadedFile(name='easy.gif',
+                                       content=self.gif,
+                                       content_type='image/gif')
         self.guest_client = Client()
         self.authorized_client = Client()
         self.authorized_client.force_login(self.user)
         self.anouther_user = Client()
         self.anouther_user.force_login(self.second_user)
 
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(settings.MEDIA_ROOT, ignore_errors=True)
+        super().tearDownClass()
+
     def collected_asserts(self, obj, inp):
         self.assertEqual(obj.author, self.post.author)
         self.assertEqual(obj.text, inp['text'])
         self.assertEqual(obj.group.id, inp['group'])
+        self.assertEqual(obj.image.name, f'posts/{inp["image"].name}')
 
     def test_create_form(self):
+        self.gif = (
+            b'\x47\x49\x46\x38\x39\x61\x02\x00'
+            b'\x01\x00\x80\x00\x00\x00\x00\x00'
+            b'\xFF\xFF\xFF\x21\xF9\x04\x00\x00'
+            b'\x00\x00\x00\x2C\x00\x00\x00\x00'
+            b'\x02\x00\x01\x00\x00\x02\x02\x0C'
+            b'\x0A\x00\x3B'
+        )
+        self.itemgif = SimpleUploadedFile(name='easy_2.gif',
+                                          content=self.gif,
+                                          content_type='image/gif')
         posts_count = Post.objects.count()
         form_data = {
             'text': 'Текст поста',
             'group': self.group.id,
+            'image': self.itemgif,
         }
         response = self.authorized_client.post(
             reverse('posts:post_create'),
             data=form_data,
             follow=True)
-        self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertRedirects(response, reverse(
             'posts:profile',
             kwargs={'username': self.user.username}))
         self.assertEqual(Post.objects.count(),
                          posts_count + 1)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         first_post = Post.objects.first()
         self.collected_asserts(first_post, form_data)
 
@@ -72,6 +107,7 @@ class PostFormTests(TestCase):
         form_data_edit = {
             'text': 'Corrected post',
             'group': self.group2.pk,
+            'image': self.easy
         }
         response = self.authorized_client.post(
             reverse('posts:post_edit', kwargs={'post_id': self.post.pk}),
