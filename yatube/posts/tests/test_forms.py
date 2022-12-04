@@ -1,7 +1,6 @@
 from http import HTTPStatus
 
 from django.conf import settings
-from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase
 from django.urls import reverse
 
@@ -158,7 +157,8 @@ class PaginatorViewsTest(TestCase):
     def test_paginator_context_in_guest_client(self):
         pages = (reverse('posts:index_page'),
                  reverse('posts:profile',
-                         kwargs={'username': f'{PaginatorViewsTest.author.username}'}),
+                         kwargs={'username': 
+                         f'{PaginatorViewsTest.author.username}'}),
                  reverse('posts:group_list',
                          kwargs={'slug': f'{self.group.slug}'}),
                  reverse('posts:follow_index')
